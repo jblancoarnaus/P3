@@ -4,6 +4,7 @@
 #include <fstream>
 #include <string.h>
 #include <errno.h>
+#include <cstdlib>
 
 #include "wavfile_mono.h"
 #include "pitch_analyzer.h"
@@ -27,6 +28,7 @@ Usage:
 Options:
     -h, --help  Show this screen
     --version   Show the version of the project
+asdsd
 
 Arguments:
     input-wav   Wave file with the audio signal
@@ -38,7 +40,7 @@ Arguments:
 int main(int argc, const char *argv[]) {
 	/// \TODO 
 	///  Modify the program syntax and the call to **docopt()** in order to
-	///  add options and arguments to the program.
+	///  add options and arguments to the program. 
     std::map<std::string, docopt::value> args = docopt::docopt(USAGE,
         {argv + 1, argv + argc},	// array of arguments, without the program name
         true,    // show help if requested
@@ -64,11 +66,18 @@ int main(int argc, const char *argv[]) {
   /// \TODO
   /// Preprocess the input signal in order to ease pitch estimation. For instance,
   /// central-clipping or low pass filtering may be used.
+  /// \DONE
+for(int i = 0; i<x.size(); i++){
+  if(x[i] < 0.01 && x[i] > -0.05)
+  x[i] = 0;
+}
   
   // Iterate for each frame and save values in f0 vector
   vector<float>::iterator iX;
-  vector<float> f0;
+  vector<float> f0, f0temp; //f0 temporal
   for (iX = x.begin(); iX + n_len < x.end(); iX = iX + n_shift) {
+
+
     float f = analyzer(iX, iX + n_len);
     f0.push_back(f);
   }
@@ -76,6 +85,17 @@ int main(int argc, const char *argv[]) {
   /// \TODO
   /// Postprocess the estimation in order to supress errors. For instance, a median filter
   /// or time-warping may be used.
+/*  int med_window = 8;
+for(int i = med_window/2; i<f0.size()-med_window/2;i++){
+
+  f0 = f0temp;
+  sort(f0temp.begin(), f0temp.end());
+  
+    cout << "Sorted \n";
+    for (auto x : f0temp)
+        cout << x << " ";
+
+}*/
 
   // Write f0 contour into the output file
   ofstream os(output_txt);
