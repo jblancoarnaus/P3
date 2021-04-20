@@ -30,12 +30,18 @@ namespace upc {
       samplingFreq, ///< sampling rate (in samples per second). Has to be set in the constructor call
       npitch_min, ///< minimum value of pitch period, in samples
       npitch_max; ///< maximum value of pitch period, in samples
+      float k0; //< Power threshold inputted by the user
+      float k1; //r[0]/r[1] threshold
  
 	///
 	/// Computes correlation from lag=0 to r.size()
 	///
     void autocorrelation(const std::vector<float> &x, std::vector<float> &r) const;
 
+	///
+	/// Computes AMDF from lag=0 to r.size()
+	///
+    unsigned int amdf(const std::vector<float> &x) const;
 	///
 	/// Returns the pitch (in Hz) of input frame x
 	///
@@ -50,6 +56,8 @@ namespace upc {
   public:
     PitchAnalyzer(	unsigned int fLen,			///< Frame length in samples
 					unsigned int sFreq,			///< Sampling rate in Hertzs
+          float k0thresh, 
+          float k1thresh,
 					Window w=PitchAnalyzer::HAMMING,	///< Window type
 					float min_F0 = MIN_F0,		///< Pitch range should be restricted to be above this value
 					float max_F0 = MAX_F0		///< Pitch range should be restricted to be below this value
@@ -59,6 +67,8 @@ namespace upc {
       samplingFreq = sFreq;
       set_f0_range(min_F0, max_F0);
       set_window(w);
+      k0 = k0thresh;
+      k1 = k1thresh;
     }
 
 	///

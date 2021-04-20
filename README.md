@@ -22,10 +22,39 @@ Ejercicios básicos
 	 NOTA: es más que probable que tenga que usar Python, Octave/MATLAB u otro programa semejante para
 	 hacerlo. Se valorará la utilización de la librería matplotlib de Python.
 
+   La autocorrelación nos queda de la forma siguiente:
+
+   <p align="center">
+   <img src="img/autocorr1.png" width="540" align="center">
+  </p>
+
    * Determine el mejor candidato para el periodo de pitch localizando el primer máximo secundario de la
      autocorrelación. Inserte a continuación el código correspondiente.
 
+  El código utilizado es:
+
+  ```cpp
+  for (iR = r.begin() + npitch_min; iR < r.begin() + npitch_max; iR++)
+  {
+    if (*iR > *iRMax)
+    {
+      iRMax = iR;
+    }
+  }
+  ```
+
    * Implemente la regla de decisión sonoro o sordo e inserte el código correspondiente.
+  
+  Una primera regla de decisión ha sido usar un umbral para r[1]/r[0]:
+   
+  ```cpp
+    if(r1norm<k1)
+    return true;
+  else
+    return false;
+  ```
+
+  Como en la práctica anterior, el valor óptimo de k1 lo hemos calculado usando un bucle con un script de shell. Para ello también hemos tenido que modificar `pitch_evaluate.cpp` y los docopts de ambos programas.
 
 - Una vez completados los puntos anteriores, dispondrá de una primera versión del detector de pitch. El 
   resto del trabajo consiste, básicamente, en obtener las mejores prestaciones posibles con él.
@@ -51,6 +80,28 @@ Ejercicios básicos
     y el *score* TOTAL proporcionados por `pitch_evaluate` en la evaluación de la base de datos 
 	`pitch_db/train`..
 
+  Para la optimización, hemos creado el siguiente script:
+
+  ```bash
+  GETF0="get_pitch"
+  EVAL="pitch_evaluate"
+
+  lower_index_bound=80                     #lower bound of the for loop
+  upper_index_bound=100                   #upper bound of the for loop
+  offset=0                                #offset of the variable we want to iterate
+  div=100                                 #controls the step size of the variable when we iterate it (=2 -> /2)
+  for index in $(seq $lower_index_bound $upper_index_bound); do #vary $index from (lower_index_bound) to (upper_index_bound)
+    k0=$(bc <<<"scale=5; $offset+$index/$div")    #stores offset+$index/div in k0 (uses basic calculator (bc) since shell doesn't seem to support floating point by default)
+    for fwav in pitch_db/train/*.wav; do
+     ff0=${fwav/.wav/.f0}
+    $GETF0 $fwav $ff0 -0 $k0> /dev/null || (echo "Error in $GETF0 $fwav $ff0"; exit 1)
+    done
+    res=`$EVAL -l pitch_db/train/*f0ref || (echo "Error in $GETF0 $fwav $ff0"; exit 1)`
+    echo "$k0 $res"
+  done
+  ```
+  Como la última vez, simplemente itera sobre el script ya hecho `run_get_pitch`, y esto lo hace variando `k0` según queramos. En este caso está modificando la variable `k0` (`-0`). Para obtener los resultados en un fichero de texto, solo hemos de añadir `>nombre_out.txt` al final del comando cuando llamamos al script. Como `pitch_evaluate` está modificado de tal manera que solo imprima el total al usar `-l`, en nuestro fichero de salida nos quedará una primera columna con los valores de `k0` y una segunda con los resultados correspondientes a ese valor.
+
    * Inserte una gráfica en la que se vea con claridad el resultado de su detector de pitch junto al del
      detector de Wavesurfer. Aunque puede usarse Wavesurfer para obtener la representación, se valorará
 	 el uso de alternativas de mayor calidad (particularmente Python).
@@ -68,6 +119,18 @@ Ejercicios de ampliación
 
   * Inserte un *pantallazo* en el que se vea el mensaje de ayuda del programa y un ejemplo de utilización
     con los argumentos añadidos.
+
+Por un lado, en el programa principal `get_pitch` hemos añadido lo siguiente:
+
+<p align="center">
+   <img src="img/docopt1.png" width="480">
+</p>
+
+Además, para faciltar la lectura y guardado en los valores generados con nuestro script de shell `opt_get_pitch`, hemos añadido la opción `-l` en `pitch_evaluate`, la cual solo imprime el resultado final del resumen:
+
+<p align="center">
+   <img src="img/docopt2.png" width="480">
+</p>
 
 - Implemente las técnicas que considere oportunas para optimizar las prestaciones del sistema de detección
   de pitch.

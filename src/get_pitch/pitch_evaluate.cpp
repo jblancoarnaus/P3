@@ -17,7 +17,7 @@ void compare(const vector<float> &vref, const vector<float> &vtest, int &num_voi
   int &num_unvoiced, int &num_voiced_unvoiced, int &num_unvoiced_voiced,
   int &num_voiced_voiced, int &num_gross_errors, float &fine_error);
 
-void print_results(int nframes, int num_voiced, int num_unvoiced,
+void print_results(bool less,int nframes, int num_voiced, int num_unvoiced,
   int num_voiced_unvoiced, int num_unvoiced_voiced, int num_voiced_voiced,
   int num_gross_errors,  float fine_errori, string filename);
 
@@ -27,7 +27,11 @@ static const char USAGE[] = R"(
 pitch_evaluate - Evaluate error rate of pitch evaluation
 
 Usage:
-    pitch_evaluate <file-f0ref> ...
+    pitch_evaluate [options] <file-f0ref> ...
+Options:
+    -h, --help       Show this screen
+    --version        Show the version of the project
+    -l, --less       Print less values  
 
 Arguments:
     file-f0ref  File with the reference values of F0 (ext. .f0ref)
@@ -40,12 +44,12 @@ Note:
 int main(int argc, const char * argv[])  {
   int vTot=0, uTot=0, vuTot=0, uvTot=0, nTot=0, grossTot=0, vvTot=0, nfiles=0;
   float fineTot=0.0F;
-
   std::map<std::string, docopt::value> args = docopt::docopt(USAGE,
     {argv + 1, argv + argc},
     true,    // show help if requested
     "2.0");   // version string
-
+    
+  bool less = args["--less"].asBool();  //Print less
   std::vector<std::string> const& file_f0ref = args["<file-f0ref>"].asStringList();
 
   for (unsigned int i=0; i<file_f0ref.size(); ++i) {
@@ -68,7 +72,8 @@ int main(int argc, const char * argv[])  {
       return 3;
     }
     
-    cout << "### Compare " << file_f0ref[i] << " and " << ftest << "\n";
+    if (!less)
+      cout << "### Compare " << file_f0ref[i] << " and " << ftest << "\n";
 
 
     int diff_frames = f0ref.size() - f0test.size();
@@ -98,17 +103,21 @@ int main(int argc, const char * argv[])  {
     fineTot  += fine_error;
     nTot     += f0ref.size();
     nfiles++;
-    
-    print_results(f0ref.size(), num_voiced, num_unvoiced, num_voiced_unvoiced, num_unvoiced_voiced, 
+    if(!less){
+  
+    print_results(less, f0ref.size(), num_voiced, num_unvoiced, num_voiced_unvoiced, num_unvoiced_voiced, 
 		  num_voiced_voiced, num_gross_errors, fine_error, ftest);
     cout << "--------------------------\n\n";
+    }
   }   
 
-  if (nfiles > 1) {
+  if (nfiles > 1&&!less) {
     cout << "### Summary\n";
-    print_results(nTot, vTot, uTot, vuTot, uvTot, vvTot, grossTot, fineTot/nfiles, "TOTAL");
+    print_results(less, nTot, vTot, uTot, vuTot, uvTot, vvTot, grossTot, fineTot/nfiles, "TOTAL");
     cout << "--------------------------\n\n";
   }
+  else if(nfiles > 1&&less)
+    print_results(less, nTot, vTot, uTot, vuTot, uvTot, vvTot, grossTot, fineTot/nfiles, "TOTAL");
  
   return 0;  
 }
@@ -167,13 +176,14 @@ void compare(const vector<float> &vref, const vector<float> &vtest,
     fine_error = sqrt(fine_error/nfine);
 }
 
-void print_results(int nframes, int num_voiced, int num_unvoiced,
+void print_results(bool less, int nframes, int num_voiced, int num_unvoiced,
   int num_voiced_unvoiced, int num_unvoiced_voiced, int num_voiced_voiced,
   int num_gross_errors,  float fine_error, string filename) {
 
   float UU, UV, VV, VU;
   float recU, recV, precU, precV, Fu, Fv, Fss, score;
 
+if(!less){
   cout << fixed << setprecision(2);
 
   cout << "Num. frames:\t" << nframes 
@@ -189,7 +199,7 @@ void print_results(int nframes, int num_voiced, int num_unvoiced,
   cout << "Gross voiced errors (+" << 100*gross_threshold << " %):\t" << num_gross_errors << "/" << num_voiced_voiced
        << " (" << 100.0F * num_gross_errors/(1.e-12 + num_voiced_voiced) << " %)\n";
   cout << "MSE of fine errors:\t" << 100*fine_error << " %\n";
-
+}
   VV = num_voiced_voiced;
   VU = num_voiced_unvoiced;
   UV = num_unvoiced_voiced;
@@ -209,7 +219,11 @@ void print_results(int nframes, int num_voiced, int num_unvoiced,
   Fss = sqrt(Fu * Fv);
 
   score = Fss * (1 - fine_error);
-
   cout << fixed << setprecision(2);
-  cout << "\n===>\t" << filename << ":\t" << 100 * score << " %\n";
+if(!less){
+
+  cout << "\n===>\t" << filename << ":\t" << 100 * score << "% \n";
+  }
+  else
+   cout <<100 * score << "\n";
 }

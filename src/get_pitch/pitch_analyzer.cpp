@@ -21,10 +21,51 @@ namespace upc
       {
         r[l] += x[n] * x[n - l];
       }
+      //fprintf(stderr,"%f\n", r[l]);
     }
 
     if (r[0] == 0.0F) //to avoid log() and divide zero
       r[0] = 1e-10;
+  }
+  unsigned int PitchAnalyzer::amdf(const vector<float> &x) const
+  {
+
+    //for (unsigned int l = 0; l < r.size(); ++l)
+    // {
+    /// \TODO Compute the autocorrelation r[l]
+    /// \DONE Autocorrelation *computed*
+    vector<float> a(npitch_max);
+    for (unsigned int k = npitch_min; k < npitch_max; k++)
+    {
+      // fprintf(stderr,"Entra 1r bucle\n");
+      a[k] = 0;
+      for (unsigned int n = 0; n < x.size() - k - 1; n++)
+      {
+        //fprintf(stderr,"Entra 2n bucle\n");
+        a[k] += abs(x[n] - x[n + k])*abs(x[n] - x[n + k]);
+      }
+    }
+    //fprintf(stderr,"end\n");
+
+    float min = a[npitch_min];
+    int lag = npitch_min;
+
+    for (unsigned int k = npitch_min; k < npitch_max; k++)
+    {
+      //fprintf(stderr," no minim lag %d min %f a[k] %f\n",lag, min, a[k]);
+      if (min > a[k])
+      {
+
+        lag = k;
+        min = a[k];
+        //fprintf(stderr,"lag %d min %f a[k] %f\n",lag, min, a[k]);
+      }
+    }
+    //  fprintf(stderr,"end2\n");
+    if(lag == 40)
+      lag = 1;
+    return lag;
+    //fprintf(stderr,"%f\n", r[l]);
   }
 
   void PitchAnalyzer::set_window(Window win_type)
@@ -38,15 +79,15 @@ namespace upc
     {
     case HAMMING:
       /// \TODO Implement the Hamming window
-      /// \DONE 
-     // float alpha = 0.53836;
-      for (unsigned int i = 0; i < frameLen; i++)
+      /// \DONE
+      // float alpha = 0.53836;
+         for (unsigned int i = 0; i < frameLen; i++)
     {
-      window[i] = 0.53836 + (1 - 0.53836) * cos((2 * M_PI / frameLen) * i); //obtain i sample of hamming window
+      window[i] = 0.53836 + (1 - 0.53836) * cos(((2 * M_PI) / frameLen) * i); //obtain i sample of hamming window
     }
   
     break;
-       
+
     case RECT:
     default:
       window.assign(frameLen, 1);
@@ -71,9 +112,9 @@ namespace upc
     /// \TODO Implement a rule to decide whether the sound is voiced or not.
     /// * You can use the standard features (pot, r1norm, rmaxnorm),
     ///   or compute and use other ones.
-    fprintf(stderr, "%f\n", r1norm);
-    //if(pot<0.5)
-    if(r1norm<0.85)
+    //fprintf(stderr, "%f\n", r1norm);
+    //&&pot<k0
+    if (r1norm < k1)
       return true;
     else
       return false;
@@ -102,8 +143,11 @@ namespace upc
     ///    - The lag corresponding to the maximum value of the pitch.
     ///	   .
     /// In either case, the lag should not exceed that of the minimum value of the pitch.
+    /* float max = 0;
+    float abs_max = 0;
+    int i = 1, pos, posini;*/
 
-    for (iR = r.begin() + npitch_min; iR < r.begin() + npitch_max; iR++)
+    /*  for (iR = r.begin() + npitch_min; iR < r.begin() + npitch_max; iR++)
     {
       if (*iR > *iRMax)
       {
@@ -111,7 +155,9 @@ namespace upc
       }
     }
     unsigned int lag = iRMax - r.begin();
-
+*/
+    unsigned int lag = amdf(x);
+    //fprintf(stderr, "lag %d\n", lag);
     float pot = 10 * log10(r[0]);
 
     //You can print these (and other) features, look at them using wavesurfer
@@ -119,10 +165,13 @@ namespace upc
     //change to #if 1 and compile
 #if 0
     if (r[0] > 0.0F)
-      cout << pot << '\t' << r[1]/r[0] << '\t' << r[lag]/r[0] << endl;
+      //cout << pot << '\t' << r[1]/r[0] << '\t' << r[lag]/r[0] << endl;
+      cout << r[0] << endl;
+    for (int i = 1; i < r.size(); i++)
+      cout << r[i] << endl;
 #endif
 
-    if (unvoiced(pot, r[1] / r[0], r[lag] / r[0]))
+    if ((unvoiced(pot, r[1] / r[0], r[lag] / r[0]))||lag==1)
       return 0;
     else
       return (float)samplingFreq / (float)lag;
