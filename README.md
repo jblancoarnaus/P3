@@ -25,8 +25,24 @@ Ejercicios básicos
    La autocorrelación nos queda de la forma siguiente:
 
    <p align="center">
-   <img src="img/autocorr1.png" width="540" align="center">
+   <img src="img/pygraph1.png" width="540" align="center">
   </p>
+
+  Para encontrar el período de la gráfica, lo hemos programado buscando picos en el tiempo. Este método no es muy fiable, ya que a la mínima que tuvieramos distorsión la gráfica en tiempo oscilaría:
+
+  ```py
+  peaks = sig.find_peaks(data_in)
+  peaks = peaks[0] 
+  first_peak = peaks[0] 
+  fm=16000
+  #find second peak (90% of the maximum)
+  max = data_in[first_peak]
+  for i in range(len(peaks)-1):
+    if((data_in[peaks[i+1]])> max*0.9):
+      second_peak = peaks[i+1]
+      break
+  ```
+  El resto del código se encuentra en `plt_aut.py`
 
    * Determine el mejor candidato para el periodo de pitch localizando el primer máximo secundario de la
      autocorrelación. Inserte a continuación el código correspondiente.
@@ -86,7 +102,7 @@ Ejercicios básicos
   GETF0="get_pitch"
   EVAL="pitch_evaluate"
 
-  lower_index_bound=80                     #lower bound of the for loop
+  lower_index_bound=80                    #lower bound of the for loop
   upper_index_bound=100                   #upper bound of the for loop
   offset=0                                #offset of the variable we want to iterate
   div=100                                 #controls the step size of the variable when we iterate it (=2 -> /2)

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <math.h>
 #include "pitch_analyzer.h"
+#include <ffft/FFTReal.h>
 
 using namespace std;
 
@@ -42,7 +43,7 @@ namespace upc
       for (unsigned int n = 0; n < x.size() - k - 1; n++)
       {
         //fprintf(stderr,"Entra 2n bucle\n");
-        a[k] += abs(x[n] - x[n + k])*abs(x[n] - x[n + k]);
+        a[k] += abs(x[n] - x[n + k]) * abs(x[n] - x[n + k]);
       }
     }
     //fprintf(stderr,"end\n");
@@ -62,7 +63,7 @@ namespace upc
       }
     }
     //  fprintf(stderr,"end2\n");
-    if(lag == 40)
+    if (lag == 40)
       lag = 1;
     return lag;
     //fprintf(stderr,"%f\n", r[l]);
@@ -79,15 +80,13 @@ namespace upc
     {
     case HAMMING:
       /// \TODO Implement the Hamming window
-      /// \DONE
+      /// \DONE Hamming window implemented
       // float alpha = 0.53836;
-         for (unsigned int i = 0; i < frameLen; i++)
-    {
-      window[i] = 0.53836 + (1 - 0.53836) * cos(((2 * M_PI) / frameLen) * i); //obtain i sample of hamming window
-    }
-  
-    break;
-
+      for (unsigned int i = 0; i < frameLen; i++)
+      {
+        window[i] = 0.6 + (1 - 0.6) * cos(((2 * M_PI) / frameLen) * i); //obtain i sample of hamming window
+      }
+      break;
     case RECT:
     default:
       window.assign(frameLen, 1);
@@ -96,12 +95,13 @@ namespace upc
 
   void PitchAnalyzer::set_f0_range(float min_F0, float max_F0)
   {
+
     npitch_min = (unsigned int)samplingFreq / max_F0;
+
     if (npitch_min < 2)
       npitch_min = 2; // samplingFreq/2
 
     npitch_max = 1 + (unsigned int)samplingFreq / min_F0;
-
     //frameLen should include at least 2*T0
     if (npitch_max > frameLen / 2)
       npitch_max = frameLen / 2;
@@ -114,7 +114,8 @@ namespace upc
     ///   or compute and use other ones.
     //fprintf(stderr, "%f\n", r1norm);
     //&&pot<k0
-    if (r1norm < k1)
+
+    if ((r1norm < k1 || rmaxnorm < k2)&&pot<k0)
       return true;
     else
       return false;
@@ -126,13 +127,37 @@ namespace upc
       return -1.0F;
 
     //Window input frame
-    for (unsigned int i = 0; i < x.size(); ++i)
+    for (unsigned int i = 0; i < x.size(); i++)
       x[i] *= window[i];
 
     vector<float> r(npitch_max);
-
     //Compute correlation
     autocorrelation(x, r);
+    /*int N = 1024;
+  float X[N], xtf[N];
+  float eps = 1e-20;
+  ffft::FFTReal <float> fft_object (N);
+  //Zero padding
+  for (int i = 0; i< N; i++) {
+    if(i>=x.size())
+    xtf[i] = 0;
+    else
+    xtf[i]=x[i];
+  }
+   for (int i =0; i< N; i++)
+    //fprintf(stderr,"x[%d] )= %f\n", i,xtf[i]);
+ // fprintf(stderr,"----------------------------\n");
+
+  fft_object.do_fft (X, xtf);     // x (real) --FFT---> f (complex)
+  for(int i = 0; i<N; i++)
+     X[i] = 10*log10(abs(X[i])+eps);
+
+  fft_object.do_ifft (X, xtf);    // f (complex) --IFFT--> x (real)
+  fft_object.rescale (xtf);       // Post-scaling should be done after FFT+IFFT
+
+  for (int i = 0; i< x.size(); i++) {
+    x[i]=xtf[i];
+  }
 
     vector<float>::const_iterator iR = r.begin(), iRMax = iR + npitch_min;
 
@@ -155,15 +180,25 @@ namespace upc
       }
     }
     unsigned int lag = iRMax - r.begin();
-*/
-    unsigned int lag = amdf(x);
+    
+
+   // 
+ for (iR = x.begin() + npitch_min; iR < x.begin() + npitch_max; iR++)
+    {
+      if (*iR > *iRMax)
+      {
+        iRMax = iR;
+      }
+    }
+    unsigned int lag = iRMax - x.begin();*/
     //fprintf(stderr, "lag %d\n", lag);
+    unsigned int lag = amdf(x);
     float pot = 10 * log10(r[0]);
 
     //You can print these (and other) features, look at them using wavesurfer
     //Based on that, implement a rule for unvoiced
     //change to #if 1 and compile
-#if 0
+#if 1
     if (r[0] > 0.0F)
       //cout << pot << '\t' << r[1]/r[0] << '\t' << r[lag]/r[0] << endl;
       cout << r[0] << endl;
@@ -171,7 +206,7 @@ namespace upc
       cout << r[i] << endl;
 #endif
 
-    if ((unvoiced(pot, r[1] / r[0], r[lag] / r[0]))||lag==1)
+    if ((unvoiced(pot, r[1] / r[0], r[lag] / r[0])) || lag == 1)
       return 0;
     else
       return (float)samplingFreq / (float)lag;
