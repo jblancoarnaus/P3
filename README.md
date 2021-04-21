@@ -88,6 +88,14 @@ Ejercicios básicos
 	    Recuerde configurar los paneles de datos para que el desplazamiento de ventana sea el adecuado, que
 		en esta práctica es de 15 ms.
 
+     Si calculamos la potencia, autocorrelación de uno y autocorrelación del máximo secundario obtenemos:
+    <p align="center">
+    <img src="img/wavesurfergraph1.png" width="720" align="center">
+    </p>
+   
+    *Potencia, r[1]/r[0], r[1]/rmax, pitch detectado por wavesurfer y señal de rl001*
+
+
       - Use el detector de pitch implementado en el programa `wavesurfer` en una señal de prueba y compare
 	    su resultado con el obtenido por la mejor versión de su propio sistema.  Inserte una gráfica
 		ilustrativa del resultado de ambos detectores.
@@ -121,6 +129,12 @@ Ejercicios básicos
    * Inserte una gráfica en la que se vea con claridad el resultado de su detector de pitch junto al del
      detector de Wavesurfer. Aunque puede usarse Wavesurfer para obtener la representación, se valorará
 	 el uso de alternativas de mayor calidad (particularmente Python).
+   
+   Nos queda lo siguiente:
+
+    <p align="center">
+    <img src="img/pygraph3.png" width="620" align="center">
+    </p>
    
 
 Ejercicios de ampliación

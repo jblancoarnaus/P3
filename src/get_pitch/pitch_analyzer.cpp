@@ -22,7 +22,6 @@ namespace upc
       {
         r[l] += x[n] * x[n - l];
       }
-      //fprintf(stderr,"%f\n", r[l]);
     }
 
     if (r[0] == 0.0F) //to avoid log() and divide zero
@@ -31,42 +30,32 @@ namespace upc
   unsigned int PitchAnalyzer::amdf(const vector<float> &x) const
   {
 
-    //for (unsigned int l = 0; l < r.size(); ++l)
-    // {
-    /// \TODO Compute the autocorrelation r[l]
-    /// \DONE Autocorrelation *computed*
     vector<float> a(npitch_max);
+    float min = -1;
+    int lag = npitch_min;
     for (unsigned int k = npitch_min; k < npitch_max; k++)
     {
-      // fprintf(stderr,"Entra 1r bucle\n");
-      a[k] = 0;
+      a[k] = 0; 
+
       for (unsigned int n = 0; n < x.size() - k - 1; n++)
       {
-        //fprintf(stderr,"Entra 2n bucle\n");
+        if (a[k] > min && min != -1)
+          continue;
         a[k] += abs(x[n] - x[n + k]) * abs(x[n] - x[n + k]);
       }
-    }
-    //fprintf(stderr,"end\n");
-
-    float min = a[npitch_min];
-    int lag = npitch_min;
-
-    for (unsigned int k = npitch_min; k < npitch_max; k++)
-    {
-      //fprintf(stderr," no minim lag %d min %f a[k] %f\n",lag, min, a[k]);
-      if (min > a[k])
+      if (min == -1)
       {
-
-        lag = k;
         min = a[k];
-        //fprintf(stderr,"lag %d min %f a[k] %f\n",lag, min, a[k]);
+      }
+      else if (min > a[k])
+      {
+        min = a[k];
+        lag = k;
       }
     }
-    //  fprintf(stderr,"end2\n");
     if (lag == 40)
       lag = 1;
     return lag;
-    //fprintf(stderr,"%f\n", r[l]);
   }
 
   void PitchAnalyzer::set_window(Window win_type)
@@ -112,10 +101,8 @@ namespace upc
     /// \TODO Implement a rule to decide whether the sound is voiced or not.
     /// * You can use the standard features (pot, r1norm, rmaxnorm),
     ///   or compute and use other ones.
-    //fprintf(stderr, "%f\n", r1norm);
-    //&&pot<k0
 
-    if ((r1norm < k1 || rmaxnorm < k2)&&pot<k0)
+    if (((r1norm < k1 || rmaxnorm < k2) && pot < k0)) //pot not checked by default (threshold is always met)
       return true;
     else
       return false;
@@ -133,6 +120,7 @@ namespace upc
     vector<float> r(npitch_max);
     //Compute correlation
     autocorrelation(x, r);
+
     /*int N = 1024;
   float X[N], xtf[N];
   float eps = 1e-20;
@@ -157,7 +145,16 @@ namespace upc
 
   for (int i = 0; i< x.size(); i++) {
     x[i]=xtf[i];
-  }
+
+    for (iR = x.begin() + npitch_min; iR < x.begin() + npitch_max; iR++)
+    {
+      if (*iR > *iRMax)
+      {
+        iRMax = iR;
+      }
+    }
+    unsigned int lag = iRMax - x.begin();
+  }*/
 
     vector<float>::const_iterator iR = r.begin(), iRMax = iR + npitch_min;
 
@@ -168,31 +165,25 @@ namespace upc
     ///    - The lag corresponding to the maximum value of the pitch.
     ///	   .
     /// In either case, the lag should not exceed that of the minimum value of the pitch.
-    /* float max = 0;
-    float abs_max = 0;
-    int i = 1, pos, posini;*/
-
-    /*  for (iR = r.begin() + npitch_min; iR < r.begin() + npitch_max; iR++)
-    {
-      if (*iR > *iRMax)
+      /// \DONE. Autocorrelation + amdf implemented, method can be chosen with -m 
+    unsigned int lag;
+    switch(method){
+      case AUT:   //Autocorrelation method
+      for (iR = r.begin() + npitch_min; iR < r.begin() + npitch_max; iR++)
       {
-        iRMax = iR;
+        if (*iR > *iRMax)
+        {
+          iRMax = iR;
+        }
       }
+      lag = iRMax -r.begin();
+      break;
+      case AMDF:  //amdf method
+      default:
+            lag = amdf(x);
+      break;
     }
-    unsigned int lag = iRMax - r.begin();
-    
 
-   // 
- for (iR = x.begin() + npitch_min; iR < x.begin() + npitch_max; iR++)
-    {
-      if (*iR > *iRMax)
-      {
-        iRMax = iR;
-      }
-    }
-    unsigned int lag = iRMax - x.begin();*/
-    //fprintf(stderr, "lag %d\n", lag);
-    unsigned int lag = amdf(x);
     float pot = 10 * log10(r[0]);
 
     //You can print these (and other) features, look at them using wavesurfer
@@ -200,10 +191,10 @@ namespace upc
     //change to #if 1 and compile
 #if 1
     if (r[0] > 0.0F)
-      //cout << pot << '\t' << r[1]/r[0] << '\t' << r[lag]/r[0] << endl;
-      cout << r[0] << endl;
+      cout << pot << '\t' << r[1] / r[0] << '\t' << r[lag] / r[0] << endl;
+      /*cout << r[0] << endl;
     for (int i = 1; i < r.size(); i++)
-      cout << r[i] << endl;
+      cout << r[i] << endl;*/
 #endif
 
     if ((unvoiced(pot, r[1] / r[0], r[lag] / r[0])) || lag == 1)
