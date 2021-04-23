@@ -26,23 +26,32 @@ Ejercicios básicos
 
    <p align="center">
    <img src="img/pygraph1.png" width="540" align="center">
-  </p>
+   </p>
 
-  Para encontrar el período de la gráfica, lo hemos programado buscando picos en el tiempo. Este método no es muy fiable, ya que a la mínima que tuvieramos distorsión la gráfica en tiempo oscilaría:
+  Como en el programa en C++, el segundo máximo de la autocorrelación lo encontramos buscando un máximo en un rango de valores determinados, lo cual independientemente de el número de ventana `window_number` que escojamos, suele funcionar bastante bien.
+  Para encontrar el período de la gráfica, lo hemos programado buscando picos en el tiempo. Este método no es muy fiable, ya que a la mínima que tuvieramos distorsión la gráfica en tiempo oscilaría. Además, se hace una suposición que no siempre se cumple (el primer pico máximo será realmente el máximo de un periodo):
 
   ```py
   peaks = sig.find_peaks(data_in)
-  peaks = peaks[0] 
+  peaks = peaks[0] #!!! highly unreliable, we can't guarantee that the first peak is a maxima
   first_peak = peaks[0] 
-  fm=16000
-  #find second peak (90% of the maximum)
+  #find second peak (90% of the maxima)
   max = data_in[first_peak]
   for i in range(len(peaks)-1):
     if((data_in[peaks[i+1]])> max*0.9):
       second_peak = peaks[i+1]
       break
+  period = (second_peak-first_peak)/fm*1000
   ```
   El resto del código se encuentra en `plt_aut.py`
+  Podemos ver como el método de búsqueda en el tiempo falla si cogemos un trozo específico de la gráfica (`first_sample_in = 1100`,
+  `last_sample_in = 1700`):
+
+   <p align="center">
+   <img src="img/pygraph1_error.png" width="540" align="center">
+   </p>
+
+  Aunque es posible hacer métodos más sofisticados para encontrar el período directamente en el señal temporal, vemos que implementaciones simples como la nuestra fallan debido a las peculiaridades de los sonidos (no es una sinusoide ideal), las cuales se suelen tratar correctamente usando la autocorrelación o AMDF.
 
    * Determine el mejor candidato para el periodo de pitch localizando el primer máximo secundario de la
      autocorrelación. Inserte a continuación el código correspondiente.
@@ -70,7 +79,7 @@ Ejercicios básicos
     return false;
   ```
 
-  Como en la práctica anterior, el valor óptimo de k1 lo hemos calculado usando un bucle con un script de shell. Para ello también hemos tenido que modificar `pitch_evaluate.cpp` y los docopts de ambos programas.
+  Como en la práctica anterior, el valor óptimo de k1 lo hemos calculado usando un bucle con un script de shell. Para ello también hemos modificado `pitch_evaluate.cpp` y los docopts de ambos programas.
 
 - Una vez completados los puntos anteriores, dispondrá de una primera versión del detector de pitch. El 
   resto del trabajo consiste, básicamente, en obtener las mejores prestaciones posibles con él.
@@ -95,6 +104,8 @@ Ejercicios básicos
    
     *Potencia, r[1]/r[0], r[1]/rmax, pitch detectado por wavesurfer y señal de rl001*
 
+    Vemos que tanto `r[1]/r[0]` como `r[1]/rmax` son buenos indicadores para detectar un sonido sonoro. Aún así, `r[1]/rmax` se dispara en silencios largos, ya que el tramo de silencio empieza a estabilizar. De todos modos, la potencia permanece en niveles bajos cuando eso pasa, así que se podría usar su valor en el caso que este umbral se dispare.
+    A partir de la gráfica podemos definir unos primeros umbrales `pot=-20`, `r[1]/r[0]=0.8` y `r[1]/r[0]=0.2`.
 
       - Use el detector de pitch implementado en el programa `wavesurfer` en una señal de prueba y compare
 	    su resultado con el obtenido por la mejor versión de su propio sistema.  Inserte una gráfica
@@ -104,7 +115,7 @@ Ejercicios básicos
     y el *score* TOTAL proporcionados por `pitch_evaluate` en la evaluación de la base de datos 
 	`pitch_db/train`..
 
-  Para la optimización, hemos creado el siguiente script:
+  Para la optimización, hemos usado el siguiente script:
 
   ```bash
   GETF0="get_pitch"
@@ -125,6 +136,7 @@ Ejercicios básicos
   done
   ```
   Como la última vez, simplemente itera sobre el script ya hecho `run_get_pitch`, y esto lo hace variando `k0` según queramos. En este caso está modificando la variable `k0` (`-0`). Para obtener los resultados en un fichero de texto, solo hemos de añadir `>nombre_out.txt` al final del comando cuando llamamos al script. Como `pitch_evaluate` está modificado de tal manera que solo imprima el total al usar `-l`, en nuestro fichero de salida nos quedará una primera columna con los valores de `k0` y una segunda con los resultados correspondientes a ese valor.
+  Adicionalmente, también hemos creado un script similar a este, el cual itera de la misma manera solo que con más de un parámetro a partir de `fors` anidados (`opt_thresh.sh`). En particular, hemos usado este script principalmente para encontrar los umbrales que nos permitían ver si era un tramo sordo o sonoro, y el primero para optimizar individualmente los nuevos parámetros que ibamos añadiendo (longitud filtro mediana, umbral zero-clipping,..)
 
    * Inserte una gráfica en la que se vea con claridad el resultado de su detector de pitch junto al del
      detector de Wavesurfer. Aunque puede usarse Wavesurfer para obtener la representación, se valorará
@@ -186,6 +198,87 @@ Además, para faciltar la lectura y guardado en los valores generados con nuestr
   por implementar el filtro de mediana, se valorará el análisis de los resultados obtenidos en función de
   la longitud del filtro.
    
+En primer lugar, antes de obtener el pitch se hace un pre-procesado del tipo *central-clipping*. Para ello, por defecto se usa el *central-clipping sin offset*, el cual pone a 0 los valores de `x` que cumplan `-clipping_thresh`< `x` <`clipping_thresh`. También se ha implementado la versión con offset, aunque esta no ha sido tan útil de cara a nuestro detector, ya que posiblemente el hecho de desplazar muestras hacia 0 ha añadido cierto ruido a la hora de tratar con la señal. Aún así, se puede añadir el offset si llamamos a `get_pitch` con la opción `-o`.
+
+```cpp
+for (unsigned int i = 0; i < x.size(); i++)
+{
+  if (abs(x[i]) < clipping_thr)
+    x[i] = 0;
+  else if (offset)
+  {
+    if (x[i] > 0) //add offset if -o == TRUE
+      x[i] = x[i] - clipping_thr;
+    else
+      x[i] = x[i] + clipping_thr;
+  }
+}
+```
+
+Hecho esto, se segmenta la señal en ventanas y se empieza a calcular la frecuencia fundamental con el método **Squared difference function** [**(SDF, tipo II)**](http://www.cs.otago.ac.nz/tartini/papers/A_Smarter_Way_to_Find_Pitch.pdf), el cual es una variante de AMDF el cual eleva al cuadrado las diferencias, lo cual le añade robustez frente el ruido:
+
+<p align="center">
+   <img src="img/sdf.png" width="280">
+</p>
+
+Este nos ha proporcionado mejores resultados que usando el AMDF, aunque perdemos parte del motivo por el cual se usa el AMDF: el coste computacional es mayor, ya se usan multiplicaciones al elevarlo al cuadrado. Además, debido a este cuadrado, tenemos la autocorrelación directamente implícita en uno de los términos (-2r[k]) si lo desarrollamos. Para los umbrales de sordo o sonoro, hemos seguido usando los datos que se usaban para la autocorrelación (`pot`,`r1norm` y `rmaxnorm`)
+El código más relevante es el siguiente:
+
+```cpp
+float min = -1;
+int lag = npitch_min;
+float m_k, r_k;
+  for (unsigned int k = npitch_min; k < npitch_max; k++)
+  {
+  a[k] = 0;
+  for (unsigned int n = 0; n < x.size() - k - 1; n++)
+  {
+    if (a[k] > min && min != -1)  //quit loop if it's bigger than the current minima and minima has been set
+      continue;
+    //ASMDF is the squared AMDF
+    //a[k] += (x[n] - x[n + k]) * (x[n] - x[n + k]) =  x[n] * x[n] + x[n + k] * x[n + k] -2*(x[n] * x[n + k]) = m_k -2r_k
+    m_k = x[n] * x[n] + x[n + k] * x[n + k];
+    r_k = x[n] * x[n + k];
+    a[k] += m_k - 2 * r_k;
+  }
+
+  if (min == -1)
+  {
+    min = a[k];
+  }
+  else if (min > a[k])
+  {
+    min = a[k];
+    lag = k;
+  }
+}
+```
+  Una ventaja que ha conservado del AMDF es que al ser un mínimo podemos salir del bucle una vez este se excede, ahorrándonos algunas operaciones.
+
+  Por último, se hace un post-procesado del vector con las frecuencias fundamentales de salida con un filtro de mediana con longitud 3. Este consiste en una ventana deslizante (`f0temp`) que calcula la mediana en cada posición y la sustituye al valor previo de `f0` para poder así eliminar pequeñas irregularidades:
+
+  ```cpp
+  int med_window = 3;
+  int half_window = round(med_window / 2);
+  for (unsigned int i = half_window; i < (f0.size() - half_window); i++)
+  {
+    for (int j = 0; j < med_window * 2; j++)
+    {
+      f0temp.push_back(f0[j + i - half_window]);
+    }
+    //sort values and pick the middle one
+    sort(f0temp.begin(), f0temp.begin() + med_window);
+    f0[i] = f0temp[round(med_window / 2)];
+    f0temp.clear();
+  }
+  ```
+  A continuación se puede ver como varía nuestro output según el filtro de mediana aplicado:
+  
+<p align="center">
+   <img src="img/medianfilters.png" width="480">
+</p>
+
+  Como se puede ver, el que nos proporciona una detección más razonable se obtiene si `window_size=3`. Por un lado, nos ayuda a eliminar irregularidades molestas que encontramos de no aplicarlo. Por otro lado, es lo suficientemente pequeño para no propagar demasiado error, lo cual ocurre a medida que utilizamos ventanas más grandes. Algo a tener en cuenta es que tomar valores pares causa confusión a la hora de encontrar el valor central de nuestro filtro, cosa que genera bastante error.
 
 Evaluación *ciega* del detector
 -------------------------------

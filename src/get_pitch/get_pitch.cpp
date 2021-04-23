@@ -12,7 +12,7 @@
 
 #include "docopt.h"
 
-#define FRAME_LEN 0.030   /* 30 ms. */
+#define FRAME_LEN 0.024   /* 24 ms. */
 #define FRAME_SHIFT 0.015 /* 15 ms. */
 
 using namespace std;
@@ -29,13 +29,14 @@ Usage:
 Options:
     -h, --help                   Show this screen
     --version                    Show the version of the project
-    -0 FLOAT, --k0=FLOAT         Power threshold [default: 5] 
+    -0 FLOAT, --k0=FLOAT         Power threshold [default: -26] 
     -1 FLOAT, --k1=FLOAT         r[1]/r[0] threshold [default: 0.7] 
     -2 FLOAT, --k2=FLOAT         r[lag]/r[0] threshold [default: 0.12]
     -c FLOAT, --clipping=FLOAT   Zero clipping threshold [default: 0.015]
+    -a FLOAT, --alpha=FLOAT      Hamming window's alpha (==0.53 for the standard Hamming window) [default: 0.625]
     -o, --offset                 Add zero-clipping offset   
     -m, --method=STRING          Choose between the autocorrelation ("aut") and AMDF ("amdf") methods [default: "amdf"]  
-    -w, --window=STRING          Choose between the Hamming window ("hamming") and rectangle window ("rectangle") [default: "hamming"]   
+    -w, --window=STRING          Choose between the Hamming window ("hamming") and rectangle window ("rectangle") [default: "hamming"]
 Arguments:
     input-wav   Wave file with the audio signal
     output-txt  Output file: ASCII file with the result of the detection:
@@ -48,6 +49,7 @@ int main(int argc, const char *argv[])
   /// \TODO
   ///  Modify the program syntax and the call to **docopt()** in order to
   ///  add options and arguments to the program.
+  /// \DONE Options added
   std::map<std::string, docopt::value> args = docopt::docopt(USAGE,
                                                              {argv + 1, argv + argc}, // array of arguments, without the program name
                                                              true,                    // show help if requested
@@ -55,15 +57,15 @@ int main(int argc, const char *argv[])
 
   std::string input_wav = args["<input-wav>"].asString();
   std::string output_txt = args["<output-txt>"].asString();
-  float k0 = stof(args["--k0"].asString()); //Power threshold
-  float k1 = stof(args["--k1"].asString()); //r[1]/r[0] threshold
-  float k2 = stof(args["--k2"].asString()); //r[lag]/r[0] threshold
+  float k0 = stof(args["--k0"].asString());       //Power threshold
+  float k1 = stof(args["--k1"].asString());       //r[1]/r[0] threshold
+  float k2 = stof(args["--k2"].asString());       //r[lag]/r[0] threshold
+  float alpha = stof(args["--alpha"].asString()); //Hamming window's alpha
 
   float clipping_thr = stof(args["--clipping"].asString()); //Zero clipping threshold
   bool offset = args["--offset"].asBool();                  //Add offset (zero clipping)
   std::string method = args["--method"].asString();         //Computing method
-  std::string window = args["--window"].asString();       //Window type
-  fprintf(stderr, "%c",method[1]);
+  std::string window = args["--window"].asString();         //Window type
 
   // Read input sound file
   unsigned int rate;
@@ -78,21 +80,21 @@ int main(int argc, const char *argv[])
   int n_shift = rate * FRAME_SHIFT;
 
   //Set window and method type
-  PitchAnalyzer::Method methodnum= PitchAnalyzer::AMDF;
+  PitchAnalyzer::Method methodnum = PitchAnalyzer::AMDF;
   PitchAnalyzer::Window windownum = PitchAnalyzer::HAMMING;
-  if(strcmp("aut", method.c_str())==0)  
-    methodnum=PitchAnalyzer::AUT;
+  if (strcmp("aut", method.c_str()) == 0)
+    methodnum = PitchAnalyzer::AUT;
 
-  if(strcmp("rectangle", window.c_str())==0) 
-    windownum=PitchAnalyzer::RECT;
+  if (strcmp("rectangle", window.c_str()) == 0)
+    windownum = PitchAnalyzer::RECT;
 
   // Define analyzer
-  PitchAnalyzer analyzer(n_len, rate, k0, k1, k2, methodnum, windownum, 50, 500);
+  PitchAnalyzer analyzer(n_len, rate, k0, k1, k2, methodnum, alpha, windownum, 50, 500);
 
   /// \TODO
   /// Preprocess the input signal in order to ease pitch estimation. For instance,
   /// central-clipping or low pass filtering may be used.
-  /// \DONE Central clipping implemented (offset is optional -o)
+  /// \DONE Central clipping implemented (clipping offset is optional -o)
   for (unsigned int i = 0; i < x.size(); i++)
   {
     if (abs(x[i]) < clipping_thr)
@@ -105,24 +107,11 @@ int main(int argc, const char *argv[])
         x[i] = x[i] + clipping_thr;
     }
   }
-  /*vector<float> num =	{ 0,                                        
--0.00016078372206606997632527544794811547, 
--0.000802890356005967441299642217700238689,
--0.002038933873048945355499483866879018024,
--0.003396830005450876717454367081927557592,
- 0.995999994467316351887120617902837693691,
--0.003396830005450876717454367081927557592,
--0.002038933873048945355499483866879018024,
--0.000802890356005967441299642217700238689,
--0.00016078372206606997632527544794811547 ,
- 0     }       ; */
-
   // Iterate for each frame and save values in f0 vector
   vector<float>::iterator iX;
   vector<float> f0, f0temp; //f0 temporal
   for (iX = x.begin(); iX + n_len < x.end(); iX = iX + n_shift)
   {
-
     float f = analyzer(iX, iX + n_len);
     f0.push_back(f);
   }
@@ -131,16 +120,15 @@ int main(int argc, const char *argv[])
   /// Postprocess the estimation in order to supress errors. For instance, a median filter
   /// or time-warping may be used.
   /// \DONE median filter (size == 3) implemented
-  int med_window = (int)3;
-
+  int med_window = 3;
   int half_window = round(med_window / 2);
   for (unsigned int i = half_window; i < (f0.size() - half_window); i++)
   {
-
     for (int j = 0; j < med_window * 2; j++)
     {
       f0temp.push_back(f0[j + i - half_window]);
     }
+    //sort values and pick the middle one
     sort(f0temp.begin(), f0temp.begin() + med_window);
     f0[i] = f0temp[round(med_window / 2)];
     f0temp.clear();

@@ -15,6 +15,9 @@ namespace upc
 
     for (unsigned int l = 0; l < r.size(); ++l)
     {
+      //Quit loop if amdf has been selected and r[0] and r[1] have been computed
+      if (method == PitchAnalyzer::AMDF && (l > 1))
+        break;
       /// \TODO Compute the autocorrelation r[l]
       /// \DONE Autocorrelation *computed*
       r[l] = 0;
@@ -33,16 +36,21 @@ namespace upc
     vector<float> a(npitch_max);
     float min = -1;
     int lag = npitch_min;
+    float m_k, r_k;
     for (unsigned int k = npitch_min; k < npitch_max; k++)
     {
-      a[k] = 0; 
-
+      a[k] = 0;
       for (unsigned int n = 0; n < x.size() - k - 1; n++)
       {
-        if (a[k] > min && min != -1)
+        if (a[k] > min && min != -1)  //quit loop if it's bigger than the current minima and minima has been set
           continue;
-        a[k] += abs(x[n] - x[n + k]) * abs(x[n] - x[n + k]);
+        //ASMDF is the squared AMDF
+        //a[k] += (x[n] - x[n + k]) * (x[n] - x[n + k]) =  x[n] * x[n] + x[n + k] * x[n + k] -2*(x[n] * x[n + k]) = m_k -2r_k
+        m_k = x[n] * x[n] + x[n + k] * x[n + k];
+        r_k = x[n] * x[n + k];
+        a[k] += m_k - 2 * r_k;
       }
+
       if (min == -1)
       {
         min = a[k];
@@ -53,16 +61,17 @@ namespace upc
         lag = k;
       }
     }
-    if (lag == 40)
+
+    //If pitch hasn't found we'll consider it unvoiced
+    if ((unsigned int)lag == npitch_min)
       lag = 1;
     return lag;
   }
 
-  void PitchAnalyzer::set_window(Window win_type)
+  void PitchAnalyzer::set_window(Window win_type, float alpha)
   {
     if (frameLen == 0)
       return;
-
     window.resize(frameLen);
 
     switch (win_type)
@@ -70,10 +79,10 @@ namespace upc
     case HAMMING:
       /// \TODO Implement the Hamming window
       /// \DONE Hamming window implemented
-      // float alpha = 0.53836;
+
       for (unsigned int i = 0; i < frameLen; i++)
       {
-        window[i] = 0.6 + (1 - 0.6) * cos(((2 * M_PI) / frameLen) * i); //obtain i sample of hamming window
+        window[i] = alpha + (1 - alpha) * cos(((2 * M_PI) / frameLen) * i); //obtain i sample of hamming window
       }
       break;
     case RECT:
@@ -102,7 +111,7 @@ namespace upc
     /// * You can use the standard features (pot, r1norm, rmaxnorm),
     ///   or compute and use other ones.
 
-    if (((r1norm < k1 || rmaxnorm < k2) && pot < k0)) //pot not checked by default (threshold is always met)
+    if ((rmaxnorm < k2 || r1norm < k1 || pot < k0)) //pot not used by default (threshold is always met)
       return true;
     else
       return false;
@@ -118,12 +127,15 @@ namespace upc
       x[i] *= window[i];
 
     vector<float> r(npitch_max);
+
     //Compute correlation
     autocorrelation(x, r);
 
-    /*int N = 1024;
+    /*int N = 1024*2;
   float X[N], xtf[N];
   float eps = 1e-20;
+
+    iR = x.begin(), iRMax = iR + npitch_min;
   ffft::FFTReal <float> fft_object (N);
   //Zero padding
   for (int i = 0; i< N; i++) {
@@ -133,7 +145,7 @@ namespace upc
     xtf[i]=x[i];
   }
    for (int i =0; i< N; i++)
-    //fprintf(stderr,"x[%d] )= %f\n", i,xtf[i]);
+ //fprintf(stderr,"x[%d] )= %f\n", i,xtf[i]);
  // fprintf(stderr,"----------------------------\n");
 
   fft_object.do_fft (X, xtf);     // x (real) --FFT---> f (complex)
@@ -142,10 +154,9 @@ namespace upc
 
   fft_object.do_ifft (X, xtf);    // f (complex) --IFFT--> x (real)
   fft_object.rescale (xtf);       // Post-scaling should be done after FFT+IFFT
-
+vector<float> cepstrum;
   for (int i = 0; i< x.size(); i++) {
-    x[i]=xtf[i];
-
+    x[i]=(xtf[i]);
     for (iR = x.begin() + npitch_min; iR < x.begin() + npitch_max; iR++)
     {
       if (*iR > *iRMax)
@@ -153,11 +164,12 @@ namespace upc
         iRMax = iR;
       }
     }
+
+  }
     unsigned int lag = iRMax - x.begin();
-  }*/
 
+*/
     vector<float>::const_iterator iR = r.begin(), iRMax = iR + npitch_min;
-
     /// \TODO
     /// Find the lag of the maximum value of the autocorrelation away from the origin.<br>
     /// Choices to set the minimum value of the lag are:
@@ -165,10 +177,12 @@ namespace upc
     ///    - The lag corresponding to the maximum value of the pitch.
     ///	   .
     /// In either case, the lag should not exceed that of the minimum value of the pitch.
-      /// \DONE. Autocorrelation + amdf implemented, method can be chosen with -m 
+    /// \DONE. Autocorrelation + amdf implemented, method can be chosen with -m
     unsigned int lag;
-    switch(method){
-      case AUT:   //Autocorrelation method
+    switch (method)
+    {
+    case AUT: //Autocorrelation method
+
       for (iR = r.begin() + npitch_min; iR < r.begin() + npitch_max; iR++)
       {
         if (*iR > *iRMax)
@@ -176,11 +190,15 @@ namespace upc
           iRMax = iR;
         }
       }
-      lag = iRMax -r.begin();
+      lag = iRMax - r.begin();
       break;
-      case AMDF:  //amdf method
-      default:
-            lag = amdf(x);
+    case AMDF: //amdf method
+    default:
+      lag = amdf(x);
+      //obtain r[lag]
+      r[lag] = 0;
+      for (unsigned int n = lag; n < x.size(); n++)
+        r[lag] += x[n] * x[n - lag];
       break;
     }
 
@@ -192,9 +210,6 @@ namespace upc
 #if 1
     if (r[0] > 0.0F)
       cout << pot << '\t' << r[1] / r[0] << '\t' << r[lag] / r[0] << endl;
-      /*cout << r[0] << endl;
-    for (int i = 1; i < r.size(); i++)
-      cout << r[i] << endl;*/
 #endif
 
     if ((unvoiced(pot, r[1] / r[0], r[lag] / r[0])) || lag == 1)
