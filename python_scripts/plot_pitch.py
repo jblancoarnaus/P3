@@ -9,6 +9,7 @@ wav_pitch = np.loadtxt('pitch_wavesurfer.txt')
 wav_pitch = wav_pitch[:, 0]
 plt.rcParams.update({'font.size': 6})
 
+fm = 20000
 fig, axs = plt.subplots(3)
 last_pos = len(data_in)
 x_axis = (np.linspace(0,last_pos-1,last_pos))/fm #obtain x axis in seconds

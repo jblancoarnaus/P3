@@ -12,7 +12,7 @@
 
 #include "docopt.h"
 
-#define FRAME_LEN 0.024   /* 24 ms. */
+#define FRAME_LEN 0.0245   /* 24.5 ms. */
 #define FRAME_SHIFT 0.015 /* 15 ms. */
 
 using namespace std;
@@ -29,13 +29,13 @@ Usage:
 Options:
     -h, --help                   Show this screen
     --version                    Show the version of the project
-    -0 FLOAT, --k0=FLOAT         Power threshold [default: -26] 
+    -0 FLOAT, --k0=FLOAT         Power threshold [default: -26.5] 
     -1 FLOAT, --k1=FLOAT         r[1]/r[0] threshold [default: 0.7] 
     -2 FLOAT, --k2=FLOAT         r[lag]/r[0] threshold [default: 0.12]
     -c FLOAT, --clipping=FLOAT   Zero clipping threshold [default: 0.015]
     -a FLOAT, --alpha=FLOAT      Hamming window's alpha (==0.53 for the standard Hamming window) [default: 0.625]
     -o, --offset                 Add zero-clipping offset   
-    -m, --method=STRING          Choose between the autocorrelation ("aut") and AMDF ("amdf") methods [default: "amdf"]  
+    -m, --method=STRING          Choose between the autocorrelation ("aut"), AMDF ("amdf") and SDF ("sdf") methods [default: "sdf"]  
     -w, --window=STRING          Choose between the Hamming window ("hamming") and rectangle window ("rectangle") [default: "hamming"]
 Arguments:
     input-wav   Wave file with the audio signal
@@ -80,10 +80,14 @@ int main(int argc, const char *argv[])
   int n_shift = rate * FRAME_SHIFT;
 
   //Set window and method type
-  PitchAnalyzer::Method methodnum = PitchAnalyzer::AMDF;
+  //default values
+  PitchAnalyzer::Method methodnum = PitchAnalyzer::SDF;
   PitchAnalyzer::Window windownum = PitchAnalyzer::HAMMING;
+
   if (strcmp("aut", method.c_str()) == 0)
     methodnum = PitchAnalyzer::AUT;
+  else if(strcmp("amdf", method.c_str()) == 0)
+    methodnum = PitchAnalyzer::AMDF;
 
   if (strcmp("rectangle", window.c_str()) == 0)
     windownum = PitchAnalyzer::RECT;
@@ -109,10 +113,22 @@ int main(int argc, const char *argv[])
   }
   // Iterate for each frame and save values in f0 vector
   vector<float>::iterator iX;
-  vector<float> f0, f0temp; //f0 temporal
+  vector<float> f0, f0temp, f0ref; //f0 temporal
+  float favg = 0;
+  int count = 0, max_count=5;
+
   for (iX = x.begin(); iX + n_len < x.end(); iX = iX + n_shift)
   {
     float f = analyzer(iX, iX + n_len);
+    if(f!=0){
+      count++;
+      favg = favg+f;
+    }
+    if(count==max_count)
+      favg = favg/max_count;
+      
+    if((f>70+favg||f<favg-70)&&count==max_count)
+      f=0;
     f0.push_back(f);
   }
 
@@ -120,13 +136,14 @@ int main(int argc, const char *argv[])
   /// Postprocess the estimation in order to supress errors. For instance, a median filter
   /// or time-warping may be used.
   /// \DONE median filter (size == 3) implemented
+  f0ref=f0;   //reference array, original values are stored here
   int med_window = 3;
   int half_window = round(med_window / 2);
   for (unsigned int i = half_window; i < (f0.size() - half_window); i++)
   {
     for (int j = 0; j < med_window * 2; j++)
     {
-      f0temp.push_back(f0[j + i - half_window]);
+      f0temp.push_back(f0ref[j + i - half_window]);
     }
     //sort values and pick the middle one
     sort(f0temp.begin(), f0temp.begin() + med_window);

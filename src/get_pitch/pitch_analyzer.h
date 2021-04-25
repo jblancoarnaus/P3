@@ -31,7 +31,8 @@ namespace upc
     enum Method
     {
       AUT,   ///< Autocorrelation method
-      AMDF ///< AMDF method
+      AMDF,  ///< AMDF method
+      SDF    ///< SDF method
     };
 
   private:
@@ -40,7 +41,7 @@ namespace upc
         samplingFreq,          ///< sampling rate (in samples per second). Has to be set in the constructor call
         npitch_min,            ///< minimum value of pitch period, in samples
         npitch_max;            ///< maximum value of pitch period, in samples
-    Method method;             ///< Computation method (==0 autocorrelation, ==1 AMDF)          
+    Method method;             ///< Computation method (==0 autocorrelation, ==1 SDF)          
     float k0;                  ///< Power threshold inputted by the user
     float k1;                  ///< r[1]/r[0] threshold
     float k2;                  ///< r[lag]/r[0] threshold
@@ -50,7 +51,7 @@ namespace upc
     void autocorrelation(const std::vector<float> &x, std::vector<float> &r) const;
 
     ///
-    /// Obtains lag by using the AMDF method
+    /// Obtains lag by using the AMDF or SDF method
     ///
     unsigned int amdf(const std::vector<float> &x) const;
     ///
@@ -69,7 +70,7 @@ namespace upc
                   float k0thresh,     ///< Power threshold
                   float k1thresh,     ///< r[1]/r[0] threshold
                   float k2thresh,     ///< r[lag]/r[0] threshold
-                  Method m,           ///< Computation method (==0 autocorrelation, ==1 AMDF)
+                  Method m,           ///< Computation method (autocorrelation, AMDF, SDF)
                   float alpha = 0.54, ///< Hamming window's alpha (==0.54 for the standard Hamming window)
                   Window w = PitchAnalyzer::HAMMING, ///< Window type
                   float min_F0 = MIN_F0,             ///< Pitch range should be restricted to be above this value

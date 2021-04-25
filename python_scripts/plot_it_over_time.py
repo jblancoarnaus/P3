@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 plt.rcParams['figure.dpi'] = 170
 data = np.loadtxt('opt_k1.txt')
 x = data[:, 0]

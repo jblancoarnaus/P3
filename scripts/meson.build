@@ -1,7 +1,7 @@
 # Scripts del proyecto
 
 scripts = [
-    'run_get_pitch.sh', 'opt_get_pitch.sh', 'opt_thresh.sh',
+    'run_get_pitch.sh', 'opt_get_pitch.sh', 'opt_thresh.sh', 'sox_resample.sh',
 ]
 
 foreach script: scripts

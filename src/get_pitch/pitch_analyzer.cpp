@@ -16,10 +16,11 @@ namespace upc
     for (unsigned int l = 0; l < r.size(); ++l)
     {
       //Quit loop if amdf has been selected and r[0] and r[1] have been computed
-      if (method == PitchAnalyzer::AMDF && (l > 1))
+      if ((method == PitchAnalyzer::SDF || method == PitchAnalyzer::AMDF) && (l > 1))
         break;
       /// \TODO Compute the autocorrelation r[l]
       /// \DONE Autocorrelation *computed*
+
       r[l] = 0;
       for (unsigned int n = l; n < x.size(); n++)
       {
@@ -42,15 +43,20 @@ namespace upc
       a[k] = 0;
       for (unsigned int n = 0; n < x.size() - k - 1; n++)
       {
-        if (a[k] > min && min != -1)  //quit loop if it's bigger than the current minima and minima has been set
+        if (a[k] > min && min != -1) //quit loop if it's bigger than the current minima and minima has been set
           continue;
-        //ASMDF is the squared AMDF
-        //a[k] += (x[n] - x[n + k]) * (x[n] - x[n + k]) =  x[n] * x[n] + x[n + k] * x[n + k] -2*(x[n] * x[n + k]) = m_k -2r_k
-        m_k = x[n] * x[n] + x[n + k] * x[n + k];
-        r_k = x[n] * x[n + k];
-        a[k] += m_k - 2 * r_k;
-      }
 
+        if (method == PitchAnalyzer::AMDF)
+          a[k] += abs(x[n] - x[n + k]);
+        else
+        {
+          //SDF is the squared AMDF
+          //a[k] += (x[n] - x[n + k]) * (x[n] - x[n + k]) =  x[n] * x[n] + x[n + k] * x[n + k] -2*(x[n] * x[n + k]) = m_k -2r_k
+          m_k = x[n] * x[n] + x[n + k] * x[n + k];
+          r_k = x[n] * x[n + k];
+          a[k] += m_k - 2 * r_k;
+        }
+      }
       if (min == -1)
       {
         min = a[k];
@@ -111,7 +117,7 @@ namespace upc
     /// * You can use the standard features (pot, r1norm, rmaxnorm),
     ///   or compute and use other ones.
 
-    if ((rmaxnorm < k2 || r1norm < k1 || pot < k0)) //pot not used by default (threshold is always met)
+    if (((rmaxnorm < k2 || r1norm < k1 || pot < k0))) 
       return true;
     else
       return false;
@@ -131,44 +137,6 @@ namespace upc
     //Compute correlation
     autocorrelation(x, r);
 
-    /*int N = 1024*2;
-  float X[N], xtf[N];
-  float eps = 1e-20;
-
-    iR = x.begin(), iRMax = iR + npitch_min;
-  ffft::FFTReal <float> fft_object (N);
-  //Zero padding
-  for (int i = 0; i< N; i++) {
-    if(i>=x.size())
-    xtf[i] = 0;
-    else
-    xtf[i]=x[i];
-  }
-   for (int i =0; i< N; i++)
- //fprintf(stderr,"x[%d] )= %f\n", i,xtf[i]);
- // fprintf(stderr,"----------------------------\n");
-
-  fft_object.do_fft (X, xtf);     // x (real) --FFT---> f (complex)
-  for(int i = 0; i<N; i++)
-     X[i] = 10*log10(abs(X[i])+eps);
-
-  fft_object.do_ifft (X, xtf);    // f (complex) --IFFT--> x (real)
-  fft_object.rescale (xtf);       // Post-scaling should be done after FFT+IFFT
-vector<float> cepstrum;
-  for (int i = 0; i< x.size(); i++) {
-    x[i]=(xtf[i]);
-    for (iR = x.begin() + npitch_min; iR < x.begin() + npitch_max; iR++)
-    {
-      if (*iR > *iRMax)
-      {
-        iRMax = iR;
-      }
-    }
-
-  }
-    unsigned int lag = iRMax - x.begin();
-
-*/
     vector<float>::const_iterator iR = r.begin(), iRMax = iR + npitch_min;
     /// \TODO
     /// Find the lag of the maximum value of the autocorrelation away from the origin.<br>
@@ -192,7 +160,7 @@ vector<float> cepstrum;
       }
       lag = iRMax - r.begin();
       break;
-    case AMDF: //amdf method
+    case SDF: //amdf method
     default:
       lag = amdf(x);
       //obtain r[lag]
@@ -207,9 +175,10 @@ vector<float> cepstrum;
     //You can print these (and other) features, look at them using wavesurfer
     //Based on that, implement a rule for unvoiced
     //change to #if 1 and compile
-#if 1
+#if 0
     if (r[0] > 0.0F)
       cout << pot << '\t' << r[1] / r[0] << '\t' << r[lag] / r[0] << endl;
+
 #endif
 
     if ((unvoiced(pot, r[1] / r[0], r[lag] / r[0])) || lag == 1)
