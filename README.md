@@ -102,7 +102,7 @@ else
   return false;
 ```
 
-Como en la práctica anterior, el valor óptimo de `k1` lo hemos calculado usando un bucle con un script de shell. Para ello también hemos modificado `pitch_evaluate.cpp` y los docopts de ambos programas. Además, nuestra regla de decisión final incluye  otros parámetros como `rmaxnorm` y `pot`, los cuales hemos optimizado de la misma manera [(explicación detallada aquí)](###optimización-de-parámetros):
+Como en la práctica anterior, el valor óptimo de `k1` lo hemos calculado usando un bucle con un script de shell. Para ello también hemos modificado `pitch_evaluate.cpp` y los docopts de ambos programas. Además, nuestra regla de decisión final incluye  otros parámetros como `rmaxnorm` y `pot`, los cuales hemos optimizado de la misma manera [(explicación detallada aquí)](#optimización-de-parámetros):
 
 ```cpp
   if (((rmaxnorm < k2 || r1norm < k1 || pot < k0))) 
@@ -401,7 +401,7 @@ A continuación se puede ver como varía nuestro output según el filtro de medi
    <img src="img/medianfilters.png" width="480">
 </p>
 
-Como se puede ver, el que nos proporciona una detección más razonable se obtiene si `window_size=3`. Este tamaño nos ayuda a eliminar irregularidades molestas que encontramos de no aplicarlo, y, a su vez, es lo suficientemente pequeño para no propagar demasiado error, lo cual ocurre a medida que aumentamos el tamaño de la ventana. Algo a tener en cuenta es que tomar valores pares como tamaño de ventana causa confusión a la hora de encontrar el valor central de nuestro filtro, cosa que a veces empeora los resultados:
+Como se puede ver, el que nos proporciona una detección más razonable se obtiene si `window_size=3`. Este tamaño nos ayuda a eliminar irregularidades molestas que encontramos de no aplicarlo, y, a su vez, es lo suficientemente pequeño para no propagar demasiado error, lo cual ocurre a medida que aumentamos el tamaño de la ventana. Algo a tener en cuenta es que tomar valores pares como tamaño de ventana causa confusión a la hora de encontrar el valor central de nuestro filtro, cosa que a veces empeora los resultados.
 
 ## Evaluación _ciega_ del detector
 
